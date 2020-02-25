@@ -13,29 +13,29 @@ public class WebServer {
 
     private void init() throws IOException {
 
-        String[] header;
+        String header;
+        String[] headers;
         String verb;
         String path;
         File file;
 
-        startStreams();
 
         while(true) {
 
-            in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-            out = clientSocket.getOutputStream();
+            startStreams();
 
-            System.out.println("header");
-            header = in.readLine().split(" ");
+
+            header = in.readLine();
+            System.out.println(header);
+            headers = header.split(" ");
             System.out.println("tale");
-            //cleanBuffer();
 
-            if(header==null || header.length<2){
+            if(header==null || headers.length<2){
                 continue;
             }
 
-            verb = header[0];
-            path = "www" + header[1];
+            verb = headers[0];
+            path = "www" + headers[1];
             file = new File(path);
 
             if (!verb.equals("GET") || !file.exists()) {
@@ -48,8 +48,8 @@ public class WebServer {
             sendFile(file);
             System.out.println("aqui");
 
-            in.close();
-            out.close();
+            close();
+
         }
 
 
@@ -101,7 +101,8 @@ public class WebServer {
     private void startStreams() throws IOException {
         serverSocket = new ServerSocket(8080);
         clientSocket = serverSocket.accept();
-
+        in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+        out = clientSocket.getOutputStream();
 
 
     }
