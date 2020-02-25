@@ -4,66 +4,147 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 
-public class WebServer implements Runnable{
+public class WebServer{
 
     private ServerSocket serverSocket;
-    private Socket clientSocket;
-    private BufferedReader in;
-    private OutputStream out;
+    public static final String PATH="www";
+    //public static final String PATH="C:\\workspace\\web-server\\www";
 
-    private void init() throws IOException {
+
+    private void init(int port) throws IOException {
+
 
         String header;
         String verb;
         String path;
-        File file;
 
 
 
 
         while(true) {
 
-            connect();
+            serverSocket=connect(port);
 
-            header = in.readLine();
-            System.out.println(header);
+            Socket clientSocket = serverSocket.accept();
 
-            if (!header.contains("GET")) {
-                notFound();
-                closeConnections();
-                continue;
-            }
-
-
-            verb = header.substring(0, header.indexOf(" "));
-            path = "/Users/codecadet/joel/workspace/homework/web-server/web-server/www" + header.substring(header.indexOf(" ") + 1, header.indexOf(" ", header.indexOf(" ") + 1));
-            file = new File(path);
-
-            if (!file.exists()) {
-                notFound();
-                closeConnections();
-                continue;
-            }
-
-            //sendHeader(file);
-
-            sendFile(file);
+            Thread thread = new Thread(new Request(clientSocket));
+            thread.start();
+            System.out.println(thread.getName());
 
             closeConnections();
-
 
         }
 
 
     }
 
+    private class Request implements Runnable{
+
+
+        private Socket clientSocket;
+
+        public Request(Socket clientSocket){
+            this.clientSocket = clientSocket;
+        }
+
+        @Override
+        public void run() {
+        String header="";
+        String verb;
+        String path;
+
+            BufferedReader in = null;
+            try {
+                in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                header = receiveHeader(in);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+
+
+        System.out.println();
+
+
+        if (header.isEmpty()) {
+            System.out.println("Empty");//Change
+            closeConnections();
+            return;
+        }
+
+
+        verb = header.substring(0, header.indexOf(" "));
+
+        if (!verb.equals("GET")) {
+            System.out.println("Wrong Verb");;
+            closeConnections();
+            return;
+        }
+
+        path = PATH + header.substring(header.indexOf(" ") + 1, header.indexOf(" ", header.indexOf(" ") + 1));
+        File file = new File(path);
+
+        System.out.println(verb);
+        System.out.println(path);
+        System.out.println(file.length());
+
+            DataOutputStream out = null;
+            try {
+                out = new DataOutputStream(clientSocket.getOutputStream());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            if (!file.exists()) {
+            try {
+                notFound(out);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            closeConnections();
+            return;
+        }
+
+
+
+
+            try {
+                sendHeader(out, file);
+                sendFile(out, file);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+        }
+    }
+
+    private String receiveHeader(BufferedReader in) throws IOException {
+
+        StringBuilder stringBuilder = new StringBuilder();
+        String line="";
+
+        while((line=in.readLine())!=null && !line.isEmpty()){
+            stringBuilder.append(line);
+        }
+
+        return stringBuilder.toString();
+
+    }
     private String header(File file, String extension){
 
         String type="";
+        String charset=" ";
 
         switch (extension) {
             case "html":
                 type="text";
+                charset="; charset=UTF-8";
                 break;
             case "png":
             case "jpeg":
@@ -75,100 +156,78 @@ public class WebServer implements Runnable{
 
         }
 
-        System.out.println(file.length());
-        System.out.println(extension);
-        System.out.println(type);
-
         return  "HTTP/1.0 200 Document Follows\r\n" +
-                "Content-Type: "+type+"/"+extension+" \r\n" +
+                "Content-Type: "+type+"/"+extension+charset+"\r\n" +
                 "Content-Length: "+file.length()+" \r\n" +
                 "\r\n";
     }
 
-    private void sendHeader(File file) throws IOException {
-        out.write(header(file, file.getName().substring(file.getName().indexOf(".")+1)).getBytes());
+    private void sendHeader(DataOutputStream out, File file) throws IOException {
+        out.writeBytes(header(file, file.getName().substring(file.getName().indexOf(".")+1)));
         out.flush();
     }
 
-    private void sendFile(File file) throws IOException {
+    private void sendFile(DataOutputStream out, File file) throws IOException {
 
 
         FileInputStream fStream = new FileInputStream(file);
-        byte[] buffer = new byte[(int)file.length()];
-        fStream.read(buffer);
+
+        byte[] buffer = new byte[1024];
 
         int num;
-        int i=0;
+
+        while((num=fStream.read(buffer))!=-1){
+            out.write(buffer, 0,num);
+        }
 
         try {
-            Thread.sleep(10000);
+            Thread.sleep(5000);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        out.write(header(file, file.getName().substring(file.getName().indexOf(".")+1)).getBytes());
-        out.write(buffer);
-        /*while((num=fStream.read(buffer))!=-1){
-            System.out.println(i+=num);
-            System.out.println("buffer length: "+num);
-            out.write(buffer, 0,num);
-        }*/
 
         fStream.close();
 
     }
 
-    private void connect() throws IOException {
+    private ServerSocket connect(int port) throws IOException {
 
 
-        serverSocket = new ServerSocket(8080);
-        clientSocket = serverSocket.accept();
+        return serverSocket = new ServerSocket(port);
 
-        in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-        out = new DataOutputStream(clientSocket.getOutputStream());
     }
 
-
-
-
-
-    private void notFound() throws IOException {
-        File file = new File("/Users/codecadet/joel/workspace/homework/web-server/web-server/www/error.html");
+    private void notFound(DataOutputStream out) throws IOException {
+        File file = new File("www/error.html");
         String message ="HTTP/1.0 404 Not Found\r\n" +
                 "Content-Type: text/html; charset=UTF-8\r\n" +
                 "Content-Length: "+file.length()+" \r\n" +
                 "\r\n";
         out.write(message.getBytes());
-        sendFile(file);
+        sendFile(out, file);
     }
 
-    private void closeConnections() throws IOException {
+    private void closeConnections()  {
 
-        serverSocket.close();
-        clientSocket.close();
+        try {
+            serverSocket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
-        in.close();
-        out.close();
     }
 
     public static void main(String[] args) {
 
-            Thread thread = new Thread(new WebServer());
-            thread.start();
+           WebServer webServer = new WebServer();
+        try {
+            webServer.init(8085);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
 
     }
 
-    @Override
-    public void run() {
-        try {
-            init();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        try {
-            closeConnections();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
+
 }
