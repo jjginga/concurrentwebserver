@@ -4,7 +4,7 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 
-public class WebServer {
+public class WebServer implements Runnable{
 
     private ServerSocket serverSocket;
     private Socket clientSocket;
@@ -100,7 +100,11 @@ public class WebServer {
         int num;
         int i=0;
 
-
+        try {
+            Thread.sleep(10000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         out.write(header(file, file.getName().substring(file.getName().indexOf(".")+1)).getBytes());
         out.write(buffer);
         /*while((num=fStream.read(buffer))!=-1){
@@ -116,7 +120,7 @@ public class WebServer {
     private void connect() throws IOException {
 
 
-        serverSocket = new ServerSocket(8081);
+        serverSocket = new ServerSocket(8080);
         clientSocket = serverSocket.accept();
 
         in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
@@ -147,18 +151,24 @@ public class WebServer {
     }
 
     public static void main(String[] args) {
-        WebServer webServer = new WebServer();
 
+            Thread thread = new Thread(new WebServer());
+            thread.start();
+
+
+    }
+
+    @Override
+    public void run() {
         try {
-            webServer.init();
+            init();
         } catch (IOException e) {
             e.printStackTrace();
-        } finally {
-            try {
-                webServer.closeConnections();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        }
+        try {
+            closeConnections();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 }
