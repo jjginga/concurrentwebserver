@@ -14,71 +14,75 @@ public class WebServer {
     private void init() throws IOException {
 
         String header;
-        String[] headers;
         String verb;
         String path;
         File file;
 
 
+
+
         while(true) {
 
-            startStreams();
-
+            connect();
 
             header = in.readLine();
             System.out.println(header);
-            headers = header.split(" ");
-            System.out.println("tale");
 
-            if(header==null || headers.length<2){
+            if (!header.contains("GET")) {
+                notFound();
+                closeConnections();
                 continue;
             }
 
-            verb = headers[0];
-            path = "www" + headers[1];
+
+            verb = header.substring(0, header.indexOf(" "));
+            path = "/Users/codecadet/joel/workspace/homework/web-server/web-server/www" + header.substring(header.indexOf(" ") + 1, header.indexOf(" ", header.indexOf(" ") + 1));
             file = new File(path);
 
-            if (!verb.equals("GET") || !file.exists()) {
-                noFound();
+            if (!file.exists()) {
+                notFound();
+                closeConnections();
                 continue;
             }
 
-            sendHeader(file);
+            //sendHeader(file);
 
             sendFile(file);
-            System.out.println("aqui");
 
-            close();
+            closeConnections();
+
 
         }
-
 
 
     }
 
     private String header(File file, String extension){
+
+        String type="";
+
         switch (extension) {
             case "html":
-                return "HTTP/1.0 200 Document Follows\r\n" +
-                        "Content-Type: text/html; charset=UTF-8\r\n" +
-                        "Content-Length: "+file.length()+" \r\n" +
-                        "\r\n";
-            case "jpg":
-                return "HTTP/1.0 200 Document Follows\r\n" +
-                        "Content-Type: image/"+extension+" \r\n" +
-                        "Content-Length: "+file.length()+" \r\n" +
-                        "\r\n";
-            case "gif":
+                type="text";
+                break;
             case "png":
             case "jpeg":
-                return "HTTP/1.0 200 Document Follows\r\n" +
-                        "Content-Type: image/"+extension+" \r\n" +
-                        "Content-Length: "+file.length()+" \r\n" +
-                        "\r\n";
+            case "jpg":
+                type="image";
+                break;
+            case "mp4":
+                type="video";
 
         }
 
-        return null;
+        System.out.println(file.length());
+        System.out.println(extension);
+        System.out.println(type);
+
+        return  "HTTP/1.0 200 Document Follows\r\n" +
+                "Content-Type: "+type+"/"+extension+" \r\n" +
+                "Content-Length: "+file.length()+" \r\n" +
+                "\r\n";
     }
 
     private void sendHeader(File file) throws IOException {
@@ -87,47 +91,57 @@ public class WebServer {
     }
 
     private void sendFile(File file) throws IOException {
-        byte[] buffer = new byte[1024];
+
+
         FileInputStream fStream = new FileInputStream(file);
+        byte[] buffer = new byte[(int)file.length()];
+        fStream.read(buffer);
 
         int num;
+        int i=0;
 
-        while((num=fStream.read(buffer))!=-1){
+
+        out.write(header(file, file.getName().substring(file.getName().indexOf(".")+1)).getBytes());
+        out.write(buffer);
+        /*while((num=fStream.read(buffer))!=-1){
+            System.out.println(i+=num);
+            System.out.println("buffer length: "+num);
             out.write(buffer, 0,num);
-        }
+        }*/
+
+        fStream.close();
 
     }
 
-    private void startStreams() throws IOException {
-        serverSocket = new ServerSocket(8080);
+    private void connect() throws IOException {
+
+
+        serverSocket = new ServerSocket(8081);
         clientSocket = serverSocket.accept();
+
         in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-        out = clientSocket.getOutputStream();
-
-
+        out = new DataOutputStream(clientSocket.getOutputStream());
     }
 
-    private void cleanBuffer() throws IOException {
-        String line;
-        while ((line=in.readLine())!=null) {
-            System.out.println(line);
-        }
-        System.out.println("finished");
-    }
 
-    private void noFound() throws IOException {
+
+
+
+    private void notFound() throws IOException {
+        File file = new File("/Users/codecadet/joel/workspace/homework/web-server/web-server/www/error.html");
         String message ="HTTP/1.0 404 Not Found\r\n" +
                 "Content-Type: text/html; charset=UTF-8\r\n" +
-                "Content-Length: <file_byte_size> \r\n" +
+                "Content-Length: "+file.length()+" \r\n" +
                 "\r\n";
         out.write(message.getBytes());
-        sendFile(new File("www/404.html"));
+        sendFile(file);
     }
 
-    private void close() throws IOException {
+    private void closeConnections() throws IOException {
 
         serverSocket.close();
         clientSocket.close();
+
         in.close();
         out.close();
     }
@@ -141,7 +155,7 @@ public class WebServer {
             e.printStackTrace();
         } finally {
             try {
-                webServer.close();
+                webServer.closeConnections();
             } catch (IOException e) {
                 e.printStackTrace();
             }
