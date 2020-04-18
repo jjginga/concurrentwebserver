@@ -8,7 +8,7 @@ public class WebServer{
 
     private ServerSocket serverSocket;
     public static final String PATH="www";
-    //public static final String PATH="C:\\workspace\\web-server\\www";
+
 
 
     private void init(int port) throws IOException {
